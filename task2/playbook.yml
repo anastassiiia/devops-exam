@@ -1,0 +1,65 @@
+---
+- name: Setup Kubernetes, Minikube, and Helm
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install required system packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - docker.io
+          - conntrack
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Download Minikube
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: /usr/local/bin/minikube
+        mode: '0755'
+
+    - name: Download Kubectl
+      get_url:
+        url: https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    - name: Install Helm via script
+      shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Start Minikube with Docker driver
+      command: minikube start --driver=docker --force
+      become: no # Docker driver краще запускати від звичайного юзера або з правами доступу до docker.sock
+
+    - name: Create systemd service for Kubectl Proxy
+      copy:
+        dest: /etc/systemd/system/kubectl-proxy.service
+        content: |
+          [Unit]
+          Description=Kubectl Proxy
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/local/bin/kubectl proxy --address='0.0.0.0' --port=8001 --accept-hosts='^.*$'
+          Restart=always
+          User=root
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start and enable Kubectl Proxy
+      systemd:
+        name: kubectl-proxy
+        state: started
+        enabled: yes
+        daemon_reload: yes
