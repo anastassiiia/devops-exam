@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  # GitHub замінить це на "dev" або "release" автоматично
+  name: APP_NAMESPACE
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chuikova-app
+  namespace: APP_NAMESPACE
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chuikova-app
+  template:
+    metadata:
+      labels:
+        app: chuikova-app
+    spec:
+      containers:
+      - name: chuikova-app
+        # GitHub підставить сюди твій DockerHub образ (наприклад, chuikova/devops-exam-pt2:1.0.0)
+        image: APP_IMAGE
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000 # Порт додатка всередині контейнера
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chuikova-service
+  namespace: APP_NAMESPACE
+spec:
+  type: ClusterIP # Використовуємо ClusterIP, бо порт-форвардинг ми робимо через SSH
+  selector:
+    app: chuikova-app
+  ports:
+    - protocol: TCP
+      port: 80 # Порт, на якому сервіс буде доступний всередині K8s
+      targetPort: 8000 # Перенаправлення на порт додатка
